@@ -80,48 +80,39 @@ Base.promote_rule(::Type{C1}, ::Type{C2}) where {C1<:CatValue, C2<:CatValue} =
 
 Base.convert(::Type{Ref}, x::CatValue) = RefValue{leveltype(x)}(x)
 Base.convert(::Type{String}, x::CatValue) = convert(String, get(x))
-Base.convert(::Type{Any}, x::CatValue) = x
 
 # Defined separately to avoid ambiguities
 Base.convert(::Type{AbstractString}, x::CategoricalString) = x
 Base.convert(::Type{T}, x::T) where {T <: CatValue} = x
 Base.convert(::Type{Union{T, Missing}}, x::T) where {T <: CatValue} = x
 Base.convert(::Type{Union{T, Nothing}}, x::T) where {T <: CatValue} = x
+
+@static if isdefined(Base, :unwrap)
+    Base.unwrap(x::CatValue) = get(x)
+else
 # General fallbacks
-Base.convert(::Type{S}, x::T) where {S, T <: CatValue} =
-    T <: S ? x : convert(S, get(x))
-Base.convert(::Type{Union{S, Missing}}, x::T) where {S, T <: CatValue} =
-    T <: S ? x : convert(S, get(x))
-Base.convert(::Type{Union{S, Nothing}}, x::T) where {S, T <: CatValue} =
-    T <: S ? x : convert(S, get(x))
+    Base.convert(::Type{Any}, x::CatValue) = x
+    Base.convert(::Type{S}, x::T) where {S, T <: CatValue} =
+        T <: S ? x : convert(S, get(x))
+    Base.convert(::Type{Union{S, Missing}}, x::T) where {S, T <: CatValue} =
+        T <: S ? x : convert(S, get(x))
+    Base.convert(::Type{Union{S, Nothing}}, x::T) where {S, T <: CatValue} =
+        T <: S ? x : convert(S, get(x))
+end
 
 (::Type{T})(x::T) where {T <: CatValue} = x
 
 Base.Broadcast.broadcastable(x::CatValue) = Ref(x)
 
-if VERSION >= v"0.7.0-DEV.2797"
-    function Base.show(io::IO, x::CatValue)
-        if Missings.T(get(io, :typeinfo, Any)) === Missings.T(typeof(x))
-            print(io, repr(x))
-        elseif isordered(pool(x))
-            @printf(io, "%s %s (%i/%i)",
-                    typeof(x), repr(x),
-                    order(x), length(pool(x)))
-        else
-            @printf(io, "%s %s", typeof(x), repr(x))
-        end
-    end
-else
-    function Base.show(io::IO, x::CatValue)
-        if get(io, :compact, false)
-            print(io, repr(x))
-        elseif isordered(pool(x))
-            @printf(io, "%s %s (%i/%i)",
-                    typeof(x), repr(x),
-                    order(x), length(pool(x)))
-        else
-            @printf(io, "%s %s", typeof(x), repr(x))
-        end
+function Base.show(io::IO, x::CatValue)
+    if Missings.T(get(io, :typeinfo, Any)) === Missings.T(typeof(x))
+        print(io, repr(x))
+    elseif isordered(pool(x))
+        @printf(io, "%s %s (%i/%i)",
+                typeof(x), repr(x),
+                order(x), length(pool(x)))
+    else
+        @printf(io, "%s %s", typeof(x), repr(x))
     end
 end
 
