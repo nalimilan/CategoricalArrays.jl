@@ -1,4 +1,4 @@
-using Compat.Statistics
+import StatsBase
 
 function fill_refs!(refs::AbstractArray, X::AbstractArray,
                     breaks::AbstractVector, extend::Bool, allow_missing::Bool)
@@ -166,7 +166,7 @@ function cut(x::AbstractArray{T, N}, breaks::AbstractVector;
 end
 
 """
-    cut(x::AbstractArray, ngroups::Integer;
+    cut(x::AbstractArray, [w::AbstractWeights, ]ngroups::Integer;
         labels::Union{AbstractVector{<:AbstractString},Function})
 
 Cut a numeric array into `ngroups` quantiles, determined using
@@ -175,3 +175,7 @@ Cut a numeric array into `ngroups` quantiles, determined using
 cut(x::AbstractArray, ngroups::Integer;
     labels::Union{AbstractVector{<:AbstractString},Function}=default_formatter) =
     cut(x, Statistics.quantile(x, (1:ngroups-1)/ngroups); extend=true, labels=labels)
+    
+cut(x::AbstractArray, w::AbstractWeights, ngroups::Integer;
+  labels::Union{AbstractVector{<:AbstractString},Function}=default_formatter) =
+  cut(x, StatsBase.quantile(x, w, (1:ngroups-1)/ngroups); extend=true, labels=labels)
