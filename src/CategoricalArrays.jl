@@ -5,7 +5,7 @@ module CategoricalArrays
     export LevelsException
 
     export categorical, compress, decompress, droplevels!, levels, levels!, levelcode,
-           isordered, ordered!
+           isordered, ordered!, uniquelevels
     export cut, recode, recode!
 
     import DataAPI: unwrap

@@ -6,13 +6,6 @@ isordered(sa::SubArray{T,N,P}) where {T,N,P<:CategoricalArray} = isordered(paren
 levels!(sa::SubArray{T,N,P}, newlevels::Vector) where {T,N,P<:CategoricalArray} =
     levels!(parent(sa), newlevels)
 
-function unique(sa::SubArray{T,N,P}) where {T,N,P<:CategoricalArray}
-    A = parent(sa)
-    refs = view(A.refs, sa.indices...)
-    S = eltype(P) >: Missing ? Union{eltype(levels(A.pool)), Missing} : eltype(levels(A.pool))
-    _unique(S, refs, A.pool)
-end
-
 refs(A::SubArray{<:Any, <:Any, <:CategoricalArray}) =
     view(parent(A).refs, parentindices(A)...)
 
