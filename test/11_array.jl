@@ -15,7 +15,7 @@ using CategoricalArrays: DefaultRefType, leveltype
     @test eltype(x) === CategoricalValue{String, R}
     @test isordered(x) === ordered
     @test levels(x) == sort(unique(a))
-    @test unique(x) == unique(a)
+    @test uniquelevels(x) == unique(a)
     @test size(x) === (3,)
     @test length(x) === 3
 
@@ -236,7 +236,7 @@ using CategoricalArrays: DefaultRefType, leveltype
 
         @test x == collect(a)
         @test isordered(x) === ordered
-        @test levels(x) == unique(x) == unique(a)
+        @test levels(x) == uniquelevels(x) == unique(a)
         @test size(x) === (4,)
         @test length(x) === 4
         @test leveltype(x) === Float64
@@ -401,7 +401,7 @@ using CategoricalArrays: DefaultRefType, leveltype
         @test x[3] === CategoricalValue(x.pool, 3)
         @test x[4] === CategoricalValue(x.pool, 4)
         @test levels(x) == unique(a)
-        @test unique(x) == unique(collect(x))
+        @test uniquelevels(x) == unique(collect(x))
 
         x[1:2] .= -1
         @test x[1] === CategoricalValue(x.pool, 5)
@@ -409,7 +409,7 @@ using CategoricalArrays: DefaultRefType, leveltype
         @test x[3] === CategoricalValue(x.pool, 3)
         @test x[4] === CategoricalValue(x.pool, 4)
         @test levels(x) == vcat(unique(a), -1)
-        @test unique(x) == unique(collect(x))
+        @test uniquelevels(x) == unique(collect(x))
 
         push!(x, 2.0)
         @test length(x) == 5
@@ -437,7 +437,7 @@ using CategoricalArrays: DefaultRefType, leveltype
 
         @test x == a
         @test isordered(x) === ordered
-        @test levels(x) == unique(x) == unique(a)
+        @test levels(x) == uniquelevels(x) == unique(a)
         @test size(x) === (2, 3)
         @test length(x) === 6
 
@@ -693,28 +693,28 @@ end
     x = CategoricalArray(["Old", "Young", "Middle", "Young"])
     @test levels!(x, ["Young", "Middle", "Old"]) === x
     @test levels(x) == ["Young", "Middle", "Old"]
-    @test unique(x) == ["Old", "Young", "Middle"]
+    @test uniquelevels(x) == ["Old", "Young", "Middle"]
     @test levels!(x, ["Young", "Middle", "Old", "Unused"]) === x
     @test levels(x) == ["Young", "Middle", "Old", "Unused"]
-    @test unique(x) == ["Old", "Young", "Middle"]
+    @test uniquelevels(x) == ["Old", "Young", "Middle"]
     @test levels!(x, ["Unused1", "Young", "Middle", "Old", "Unused2"]) === x
     @test levels(x) == ["Unused1", "Young", "Middle", "Old", "Unused2"]
-    @test unique(x) == ["Old", "Young", "Middle"]
+    @test uniquelevels(x) == ["Old", "Young", "Middle"]
 
     x = CategoricalArray(String[])
     @test isa(levels(x), Vector{String}) && isempty(levels(x))
-    @test isa(unique(x), Vector{String}) && isempty(unique(x))
+    @test isa(uniquelevels(x), Vector{String}) && isempty(uniquelevels(x))
     @test levels!(x, ["Young", "Middle", "Old"]) === x
     @test levels(x) == ["Young", "Middle", "Old"]
-    @test isa(unique(x), Vector{String}) && isempty(unique(x))
+    @test isa(uniquelevels(x), Vector{String}) && isempty(uniquelevels(x))
 
     # To test short-circuiting
     x = CategoricalArray(repeat(1:10, inner=10))
     @test levels(x) == collect(1:10)
-    @test unique(x) == collect(1:10)
+    @test uniquelevels(x) == collect(1:10)
     @test levels!(x, [19:-1:1; 20]) === x
     @test levels(x) == [19:-1:1; 20]
-    @test unique(x) == collect(1:10)
+    @test uniquelevels(x) == collect(1:10)
 end
 
 end
