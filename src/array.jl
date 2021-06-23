@@ -769,7 +769,7 @@ function levels!(A::CategoricalArray{T, N, R}, newlevels::Vector;
     end
     if !allunique(newlevels)
         throw(ArgumentError(string("duplicated levels found: ",
-                                   join(unique(filter(x->sum(newlevels.==x)>1, newlevels)), ", "))))
+                                   join(unique(filter(x->sum(==(x), newlevels)>1, newlevels)), ", "))))
     end
 
     oldlevels = levels(A.pool)
