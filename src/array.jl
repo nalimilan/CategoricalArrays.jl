@@ -767,41 +767,51 @@ function levels!(A::CategoricalArray{T, N, R}, newlevels::Vector;
                      :levels!)
         allowmissing = allow_missing
     end
-    if !allunique(newlevels)
-        throw(ArgumentError(string("duplicated levels found: ",
-                                   join(unique(filter(x->sum(newlevels.==x)>1, newlevels)), ", "))))
+    (levels(A) == newlevels) && return A # nothing to do
+
+    # prepare a map from new levels to their refs
+    newlv2ref = Dict{eltype(newlevels), Tuple{Int, Int}}()
+    dupnewlvs = similar(newlevels, 0)
+    for (i, lv) in enumerate(newlevels)
+        lvref = get(newlv2ref, lv, (i, 0))
+        newlv2ref[lv] = (lvref[1], lvref[2] + 1)
+        # remember the first duplicate occurrence
+        (lvref[2] == 1) && push!(dupnewlvs, lv)
+    end
+    if !isempty(dupnewlvs)
+        throw(ArgumentError(string("duplicated levels found: ", join(dupnewlvs, ", "))))
     end
 
-    oldlevels = levels(A.pool)
+    oldlevels = levels(pool(A))
+    oldref2newref = fill(0, length(oldlevels) + 1)
+    for (i, lv) in enumerate(oldlevels)
+        oldref2newref[i + 1] = first(get(newlv2ref, lv, (0, 0)))
+    end
 
     # first pass to check whether, if some levels are removed, changes can be applied without error
-    # TODO: save original levels and undo changes in case of error to skip this step
-    # equivalent to issubset but faster due to JuliaLang/julia#24624
-    if !isempty(setdiff(oldlevels, newlevels))
-        deleted = [!(l in newlevels) for l in oldlevels]
+    if (!(T >: Missing) || !allowmissing) && any(==(0), view(oldref2newref, 2:length(oldref2newref)))
         @inbounds for (i, x) in enumerate(A.refs)
-            if T >: Missing
-                !allowmissing && x > 0 && deleted[x] &&
-                    throw(ArgumentError("cannot remove level $(repr(oldlevels[x])) as it " *
-                                        "is used at position $i and allowmissing=false."))
-            else
-                x > 0 && deleted[x] &&
-                    throw(ArgumentError("cannot remove level $(repr(oldlevels[x])) as it " *
-                                        "is used at position $i. Change the array element " *
-                                        "type to Union{$T, Missing} using convert if you want " *
-                                        "to transform some levels to missing values."))
+            if x > 0 && (oldref2newref[x+1] == 0)
+                msg = "cannot remove level $(repr(oldlevels[x])) as it is used at position $i"
+                if !(T >: Missing)
+                    msg *= ". Change the array element type to Union{$T, Missing}"
+                           " using convert if you want to transform some levels to missing values."
+                elseif !allowmissing
+                    msg *= " and allowmissing=false."
+                end
+                throw(ArgumentError(msg))
             end
         end
     end
 
-    # replace the pool and recode refs to reflect new pool
-    if newlevels != oldlevels
-        newpool = CategoricalPool{nonmissingtype(T), R}(copy(newlevels), isordered(A.pool))
-        update_refs!(A, newlevels)
-        A.pool = newpool
+    # replace the pool
+    A.pool = CategoricalPool{nonmissingtype(T), R}(copy(newlevels), isordered(A))
+    # recode refs
+    arefs = A.refs
+    @inbounds for i in eachindex(arefs)
+        arefs[i] = oldref2newref[Int(arefs[i]) + 1]
     end
-
-    A
+    return A
 end
 
 function _unique(::Type{S},
