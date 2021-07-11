@@ -790,7 +790,7 @@ function levels!(A::CategoricalArray{T, N, R}, newlevels::Vector;
     end
 
     # first pass to check whether, if some levels are removed, changes can be applied without error
-    if (!(T >: Missing) || !allowmissing) && any(==(0), view(oldref2newref, 2:length(oldref2newref)))
+    if (!(T >: Missing) || !allowmissing) && any(iszero, @view oldref2newref[2:end])
         @inbounds for (i, x) in enumerate(A.refs)
             if x > 0 && (oldref2newref[x + 1] == 0)
                 msg = "cannot remove level $(repr(oldlevels[x])) as it is used at position $i"
