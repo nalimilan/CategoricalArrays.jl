@@ -769,24 +769,23 @@ function levels!(A::CategoricalArray{T, N, R}, newlevels::Vector;
     end
     (levels(A) == newlevels) && return A # nothing to do
 
-    # map each new level to its ref code and number of occurrences
-    newlv2ref = Dict{eltype(newlevels), Pair{Int, Int}}()
+    # map each new level to its ref code
+    newlv2ref = Dict{eltype(newlevels), Int}()
     dupnewlvs = similar(newlevels, 0)
     for (i, lv) in enumerate(newlevels)
-        lvref = get(newlv2ref, lv, i => 0)
-        newlv2ref[lv] = lvref[1] => lvref[2] + 1
-        # remember the first duplicate occurrence
-        (lvref[2] == 1) && push!(dupnewlvs, lv)
+        if get!(newlv2ref, lv, i) != i
+            push!(dupnewlvs, lv)
+        end
     end
     if !isempty(dupnewlvs)
-        throw(ArgumentError(string("duplicated levels found: ", join(dupnewlvs, ", "))))
+        throw(ArgumentError(string("duplicated levels found: ", join(unique!(dupnewlvs), ", "))))
     end
 
     # map each old ref code to new ref code (or 0 if no such level)
     oldlevels = levels(pool(A))
     oldref2newref = fill(0, length(oldlevels) + 1)
     for (i, lv) in enumerate(oldlevels)
-        oldref2newref[i + 1] = first(get(newlv2ref, lv, 0 => 0))
+        oldref2newref[i + 1] = get(newlv2ref, lv, 0)
     end
 
     # first pass to check whether, if some levels are removed, changes can be applied without error
