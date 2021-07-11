@@ -769,12 +769,12 @@ function levels!(A::CategoricalArray{T, N, R}, newlevels::Vector;
     end
     (levels(A) == newlevels) && return A # nothing to do
 
-    # prepare a map from new levels to their refs
-    newlv2ref = Dict{eltype(newlevels), Tuple{Int, Int}}()
+    # map each new level to its ref code and number of occurrences
+    newlv2ref = Dict{eltype(newlevels), Pair{Int, Int}}()
     dupnewlvs = similar(newlevels, 0)
     for (i, lv) in enumerate(newlevels)
-        lvref = get(newlv2ref, lv, (i, 0))
-        newlv2ref[lv] = (lvref[1], lvref[2] + 1)
+        lvref = get(newlv2ref, lv, i => 0)
+        newlv2ref[lv] = lvref[1] => lvref[2] + 1
         # remember the first duplicate occurrence
         (lvref[2] == 1) && push!(dupnewlvs, lv)
     end
@@ -782,16 +782,17 @@ function levels!(A::CategoricalArray{T, N, R}, newlevels::Vector;
         throw(ArgumentError(string("duplicated levels found: ", join(dupnewlvs, ", "))))
     end
 
+    # map each old ref code to new ref code (or 0 if no such level)
     oldlevels = levels(pool(A))
     oldref2newref = fill(0, length(oldlevels) + 1)
     for (i, lv) in enumerate(oldlevels)
-        oldref2newref[i + 1] = first(get(newlv2ref, lv, (0, 0)))
+        oldref2newref[i + 1] = first(get(newlv2ref, lv, 0 => 0))
     end
 
     # first pass to check whether, if some levels are removed, changes can be applied without error
     if (!(T >: Missing) || !allowmissing) && any(==(0), view(oldref2newref, 2:length(oldref2newref)))
         @inbounds for (i, x) in enumerate(A.refs)
-            if x > 0 && (oldref2newref[x+1] == 0)
+            if x > 0 && (oldref2newref[x + 1] == 0)
                 msg = "cannot remove level $(repr(oldlevels[x])) as it is used at position $i"
                 if !(T >: Missing)
                     msg *= ". Change the array element type to Union{$T, Missing}"
@@ -809,7 +810,7 @@ function levels!(A::CategoricalArray{T, N, R}, newlevels::Vector;
     # recode refs
     arefs = A.refs
     @inbounds for i in eachindex(arefs)
-        arefs[i] = oldref2newref[Int(arefs[i]) + 1]
+        arefs[i] = oldref2newref[arefs[i] + 1]
     end
     return A
 end
