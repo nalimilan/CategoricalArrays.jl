@@ -767,41 +767,73 @@ function levels!(A::CategoricalArray{T, N, R}, newlevels::Vector;
                      :levels!)
         allowmissing = allow_missing
     end
-    if !allunique(newlevels)
-        throw(ArgumentError(string("duplicated levels found: ",
-                                   join(unique(filter(x->sum(newlevels.==x)>1, newlevels)), ", "))))
-    end
+    (levels(A) == newlevels) && return A # nothing to do
 
-    oldlevels = levels(A.pool)
-
-    # first pass to check whether, if some levels are removed, changes can be applied without error
-    # TODO: save original levels and undo changes in case of error to skip this step
-    # equivalent to issubset but faster due to JuliaLang/julia#24624
-    if !isempty(setdiff(oldlevels, newlevels))
-        deleted = [!(l in newlevels) for l in oldlevels]
-        @inbounds for (i, x) in enumerate(A.refs)
-            if T >: Missing
-                !allowmissing && x > 0 && deleted[x] &&
-                    throw(ArgumentError("cannot remove level $(repr(oldlevels[x])) as it " *
-                                        "is used at position $i and allowmissing=false."))
-            else
-                x > 0 && deleted[x] &&
-                    throw(ArgumentError("cannot remove level $(repr(oldlevels[x])) as it " *
-                                        "is used at position $i. Change the array element " *
-                                        "type to Union{$T, Missing} using convert if you want " *
-                                        "to transform some levels to missing values."))
-            end
+    # map each new level to its ref code
+    newlv2ref = Dict{eltype(newlevels), Int}()
+    dupnewlvs = similar(newlevels, 0)
+    for (i, lv) in enumerate(newlevels)
+        if get!(newlv2ref, lv, i) != i
+            push!(dupnewlvs, lv)
         end
     end
-
-    # replace the pool and recode refs to reflect new pool
-    if newlevels != oldlevels
-        newpool = CategoricalPool{nonmissingtype(T), R}(copy(newlevels), isordered(A.pool))
-        update_refs!(A, newlevels)
-        A.pool = newpool
+    if !isempty(dupnewlvs)
+        throw(ArgumentError(string("duplicated levels found: ", join(unique!(dupnewlvs), ", "))))
     end
 
-    A
+    # map each old ref code to new ref code (or 0 if no such level)
+    oldlevels = levels(pool(A))
+    oldref2newref = fill(0, length(oldlevels) + 1)
+    for (i, lv) in enumerate(oldlevels)
+        oldref2newref[i + 1] = get(newlv2ref, lv, 0)
+    end
+
+    # create the new pool early (throws if the new levels could not be encoded with R)
+    newpool = CategoricalPool{nonmissingtype(T), R}(copy(newlevels), isordered(A))
+
+    # recode the refs
+    arefs = A.refs
+    # check whether potentially an error can occur due to a missing level
+    if (!(T >: Missing) || !allowmissing) && any(iszero, @view oldref2newref[2:end])
+        # slow pass, check for missing levels
+        failedpos = 0
+        @inbounds for (i, oldref) in enumerate(arefs)
+            newref = oldref2newref[oldref + 1]
+            if (oldref > 0) && (newref == 0)
+                failedpos = i
+                break
+            end
+            arefs[i] = newref
+        end
+
+        if failedpos > 0 # a missing at failedpos, revert the changes to A.refs
+            # build the inverse ref map
+            newref2oldref = fill(0, length(newlevels) + 1)
+            @inbounds for (oldref, newref) in enumerate(oldref2newref)
+                newref2oldref[newref + 1] = oldref - 1
+            end
+            # revert the refs
+            @inbounds for i in 1:(failedpos - 1)
+                arefs[i] = newref2oldref[arefs[i] + 1]
+            end
+            # throw an error
+            msg = "cannot remove level $(repr(oldlevels[arefs[failedpos]])) as it is used at position $failedpos"
+            if !(T >: Missing)
+                msg *= ". Change the array element type to Union{$T, Missing}" *
+                       " using convert if you want to transform some levels to missing values."
+            elseif !allowmissing
+                msg *= " and allowmissing=false."
+            end
+            throw(ArgumentError(msg))
+        end
+    else # fast pass, either the new missings are allowed or no new missing can occur
+        @inbounds for i in eachindex(arefs)
+            arefs[i] = oldref2newref[arefs[i] + 1]
+        end
+    end
+    A.pool = newpool # update the pool
+
+    return A
 end
 
 function _unique(::Type{S},
