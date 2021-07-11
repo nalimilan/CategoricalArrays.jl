@@ -795,7 +795,7 @@ function levels!(A::CategoricalArray{T, N, R}, newlevels::Vector;
             if x > 0 && (oldref2newref[x + 1] == 0)
                 msg = "cannot remove level $(repr(oldlevels[x])) as it is used at position $i"
                 if !(T >: Missing)
-                    msg *= ". Change the array element type to Union{$T, Missing}"
+                    msg *= ". Change the array element type to Union{$T, Missing}" *
                            " using convert if you want to transform some levels to missing values."
                 elseif !allowmissing
                     msg *= " and allowmissing=false."
